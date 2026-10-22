@@ -1,4 +1,4 @@
-import { allFaqs, type FAQItem } from "@/features/marketing/faq/faqData";
+import { allFaqs, type FAQCategory } from "@/features/marketing/faq/faqData";
 import searchIndex from "@/lib/searchIndex";
 import { searchSiteIndex, type SiteSearchHit } from "@/lib/siteSearch";
 
@@ -13,7 +13,16 @@ export type VoiceAnswer = {
   related: SiteSearchHit[];
 };
 
-type KnowledgeItem = FAQItem & { id: string; aliases?: string[] };
+/** Site knowledge may use FAQ categories plus voice-only labels like About. */
+type KnowledgeCategory = FAQCategory | "About";
+
+type KnowledgeItem = {
+  id: string;
+  question: string;
+  answer: string;
+  category: KnowledgeCategory;
+  aliases?: string[];
+};
 
 const SITE_OVERVIEW =
   "First Step Wealth Group is a Canadian platform that helps newcomers, immigrants, and families take confident financial steps. The website covers rental guarantee support when you may not have Canadian credit or a guarantor, insurance and advisor career pathways, real estate and mortgage guidance, wealth education with a compounding calculator, a blog, FAQs, testimonials, and a free discovery call to get started. You can browse services, create an account for applications and documents, and reach the team from almost any page.";
