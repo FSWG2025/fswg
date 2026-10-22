@@ -4,12 +4,8 @@ import {
   isSpeechRecognitionSupported,
   type SpeechRecognitionLike,
 } from "@/lib/speechRecognition";
-import {
-  answerVoiceQuestion,
-  speakText,
-  stopSpeaking,
-  type VoiceAnswer,
-} from "@/lib/voiceAskAnswers";
+import { answerVoiceQuestion, type VoiceAnswer } from "@/lib/voiceAskAnswers";
+import { speakText, stopSpeaking } from "@/lib/voiceSpeech";
 
 export type VoiceAskStatus =
   | "idle"
@@ -70,6 +66,15 @@ export function useVoiceAsk(options: Options = {}) {
     answeredRef.current = true;
     activeRef.current = false;
     clearSilenceTimer();
+
+    // Fully release the mic before TTS — otherwise Chrome often stays silent
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+
     setStatus("processing");
     setTranscript(cleaned);
     setInterim("");
@@ -79,7 +84,10 @@ export function useVoiceAsk(options: Options = {}) {
     setStatus("answered");
     onAnswerRef.current?.(result);
     if (speakRef.current) {
-      speakText(result.answer);
+      // Let the recognition session finish tearing down, then speak
+      window.setTimeout(() => {
+        if (speakRef.current) speakText(result.answer);
+      }, 180);
     }
   }, [clearSilenceTimer]);
 
