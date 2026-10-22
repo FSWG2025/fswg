@@ -142,7 +142,11 @@ export default function NavbarVoiceAskModal({
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
             onClick={(e) => e.stopPropagation()}
-            className="relative flex h-[45vh] max-h-[45vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_24px_80px_rgba(18,33,62,0.28)] sm:rounded-[28px]"
+            className={`relative flex h-[45vh] max-h-[45vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] shadow-[0_24px_80px_rgba(18,33,62,0.28)] sm:rounded-[28px] ${
+              hasAnswer
+                ? "voice-ask-cinematic"
+                : "bg-white"
+            }`}
           >
             <div className="flex shrink-0 items-center justify-between px-3 pb-0 pt-2.5 sm:px-4">
               <button
@@ -209,7 +213,7 @@ export default function NavbarVoiceAskModal({
               </div>
 
               {hasAnswer ? (
-                <div className="mt-2 flex min-h-0 w-full flex-1 flex-col rounded-[18px] bg-[#F4F7FB] p-3">
+                <div className="voice-ask-cinematic mt-2 flex min-h-0 w-full flex-1 flex-col rounded-[18px] p-3 ring-1 ring-[#C69259]/20">
                   {speakOn ? (
                     <button
                       type="button"
@@ -231,7 +235,7 @@ export default function NavbarVoiceAskModal({
                     className="min-h-0 w-full flex-1 overflow-hidden text-left"
                     aria-label="Play spoken answer"
                   >
-                    <p className="text-center text-[13px] leading-snug text-[#374151]">
+                    <p className="text-center text-[13px] leading-snug text-[#12213E]/90">
                       {pages[currentPage]}
                     </p>
                   </button>
