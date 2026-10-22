@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowRight, Search, ChevronDown } from "lucide-react";
+import { Menu, X, ArrowRight, Mic, ChevronDown } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/AuthProvider";
 import { useMediaQuery, breakpoints } from "@/hooks/useMediaQuery";
 import LeadCaptureModal from "@/components/global/LeadCaptureModal";
 import { mainLinks, servicesLinks } from "@/features/marketing/navbar/navLinks";
 import NavbarMenuLinks, { useMenuRowCount } from "@/features/marketing/navbar/NavbarMenuLinks";
-import NavbarSearchModal from "@/features/marketing/navbar/NavbarSearchModal";
-import { mergeSearchHits, searchSiteIndex } from "@/lib/siteSearch";
+import NavbarVoiceAskModal from "@/features/marketing/navbar/NavbarVoiceAskModal";
+import type { SiteSearchHit } from "@/lib/siteSearch";
 import {
   buildLocationKey,
   sanitizeAppPath,
@@ -19,10 +18,7 @@ import {
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [visible, setVisible] = useState(true);
-  const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [voiceAskOpen, setVoiceAskOpen] = useState(false);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [educationOpen, setEducationOpen] = useState(false);
@@ -30,7 +26,6 @@ const Navbar = () => {
   const prevScrollY = useRef(0);
   const location = useLocation();
   const navigate = useNavigate();
-  const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const loginHref = withReturnTo(
     "/login",
@@ -59,7 +54,7 @@ const Navbar = () => {
 
   // Lock body scroll when overlays open
   useEffect(() => {
-    if (isOpen || searchModalOpen) {
+    if (isOpen || voiceAskOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -67,58 +62,16 @@ const Navbar = () => {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen, searchModalOpen]);
+  }, [isOpen, voiceAskOpen]);
 
   // Close overlay menu when switching to desktop inline nav
   useEffect(() => {
     if (isLg) setIsOpen(false);
   }, [isLg]);
 
-  // Search: local site index instantly + API results (blogs/services)
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setSearchLoading(false);
-      return;
-    }
-
-    const local = searchSiteIndex(searchQuery);
-    setSearchResults(local);
-    setSearchLoading(true);
-
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const { data } = await api.get(
-          `/search?q=${encodeURIComponent(searchQuery)}`
-        );
-        const remote = (data.results || []).map((r: any) => ({
-          id: String(r.id || r._id || r.url || r.title),
-          type: r.type || "page",
-          title: r.title,
-          snippet: (r.snippet || "").replace(/<[^>]*>/g, "").slice(0, 140),
-          url: r.url || "/",
-        }));
-        setSearchResults(mergeSearchHits(local, remote));
-      } catch {
-        setSearchResults(local);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 220);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (searchModalOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [searchModalOpen]);
-
-  const handleResultSelect = (result: any) => {
-    setSearchModalOpen(false);
-    setSearchQuery("");
-    const url = result.url as string | undefined;
+  const handleRelatedSelect = (result: SiteSearchHit) => {
+    setVoiceAskOpen(false);
+    const url = result.url;
     if (!url) return;
     const safe = sanitizeAppPath(url.split("#")[0]);
     if (!safe) return;
@@ -133,7 +86,7 @@ const Navbar = () => {
       navigate(safe);
       requestAnimationFrame(() => {
         document
-          .getElementById(result.sectionId)
+          .getElementById(result.sectionId!)
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       return;
@@ -249,11 +202,13 @@ const Navbar = () => {
 
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => setSearchModalOpen(true)}
+              type="button"
+              onClick={() => setVoiceAskOpen(true)}
               className="rounded-full p-2 text-[#12213E] transition-colors hover:bg-[#12213E]/5"
-              aria-label="Search"
+              aria-label="Ask with your voice"
+              title="Ask with your voice"
             >
-              <Search className="h-5 w-5" />
+              <Mic className="h-5 w-5" />
             </button>
             {!user && (
               <Link to={loginHref} className="cta-email hidden sm:inline-flex">
@@ -281,15 +236,10 @@ const Navbar = () => {
         </div>
       </nav>
 
-      <NavbarSearchModal
-        open={searchModalOpen}
-        onClose={() => setSearchModalOpen(false)}
-        query={searchQuery}
-        setQuery={setSearchQuery}
-        results={searchResults}
-        loading={searchLoading}
-        inputRef={inputRef}
-        onSelect={handleResultSelect}
+      <NavbarVoiceAskModal
+        open={voiceAskOpen}
+        onClose={() => setVoiceAskOpen(false)}
+        onSelectRelated={handleRelatedSelect}
       />
 
       {/* Mobile bottom sheet / Tablet sidebar */}
