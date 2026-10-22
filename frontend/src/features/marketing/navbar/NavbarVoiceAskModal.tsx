@@ -115,12 +115,12 @@ export default function NavbarVoiceAskModal({
   const liveText = interim || transcript;
 
   const statusLabel = listening
-    ? "Listening… pause when done"
+    ? "Listening… pause when you are done"
     : processing
       ? "Finding an answer…"
       : supported
-        ? "Tap the mic and ask"
-        : "Voice unavailable here";
+        ? "Tap the mic and ask your question"
+        : "Voice is not available in this browser";
 
   return (
     <AnimatePresence>
@@ -171,47 +171,45 @@ export default function NavbarVoiceAskModal({
               </button>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-1 sm:px-4">
-              {/* Compact mic row */}
-              <div className="flex shrink-0 items-center gap-3">
+            <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-3 pt-1 sm:px-4">
+              {/* Centered mic + status (compact so the sheet stays ~45vh) */}
+              <div className="flex w-full shrink-0 flex-col items-center">
                 <button
                   type="button"
                   disabled={!supported || processing}
                   onClick={onMicClick}
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-50 ${
+                  className={`flex h-14 w-14 items-center justify-center rounded-full text-white disabled:opacity-50 ${
                     listening || processing ? "bg-[#C69259]" : "bg-[#12213E]"
                   }`}
                   aria-pressed={listening}
                   aria-label={listening ? "Stop listening" : "Start listening"}
                 >
                   {processing ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   ) : supported ? (
-                    <Mic className="h-5 w-5" />
+                    <Mic className="h-6 w-6" />
                   ) : (
-                    <MicOff className="h-5 w-5" />
+                    <MicOff className="h-6 w-6" />
                   )}
                 </button>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#12213E]">
-                    {statusLabel}
+                <p className="mt-2 text-center text-sm font-semibold text-[#12213E]">
+                  {statusLabel}
+                </p>
+                {liveText && !hasAnswer ? (
+                  <p className="mt-1 line-clamp-2 max-w-sm text-center text-xs leading-snug text-[#6B7280]">
+                    “{liveText}
+                    {interim ? "…" : ""}”
                   </p>
-                  {liveText && !hasAnswer ? (
-                    <p className="mt-0.5 truncate text-xs text-[#6B7280]">
-                      “{liveText}
-                      {interim ? "…" : ""}”
-                    </p>
-                  ) : null}
-                  {error ? (
-                    <p className="mt-0.5 truncate text-xs text-red-600" role="alert">
-                      {error}
-                    </p>
-                  ) : null}
-                </div>
+                ) : null}
+                {error ? (
+                  <p className="mt-1 max-w-sm text-center text-xs text-red-600" role="alert">
+                    {error}
+                  </p>
+                ) : null}
               </div>
 
               {hasAnswer ? (
-                <div className="mt-2 flex min-h-0 flex-1 flex-col rounded-[18px] bg-[#F4F7FB] p-3">
+                <div className="mt-2 flex min-h-0 w-full flex-1 flex-col rounded-[18px] bg-[#F4F7FB] p-3">
                   {speakOn ? (
                     <button
                       type="button"
@@ -233,7 +231,7 @@ export default function NavbarVoiceAskModal({
                     className="min-h-0 w-full flex-1 overflow-hidden text-left"
                     aria-label="Play spoken answer"
                   >
-                    <p className="text-[13px] leading-snug text-[#374151]">
+                    <p className="text-center text-[13px] leading-snug text-[#374151]">
                       {pages[currentPage]}
                     </p>
                   </button>
@@ -281,13 +279,7 @@ export default function NavbarVoiceAskModal({
                     </button>
                   ) : null}
                 </div>
-              ) : (
-                <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
-                  <p className="px-4 text-center text-xs leading-relaxed text-[#9CA3AF]">
-                    Ask about rentals, insurance, wealth, or anything on this site.
-                  </p>
-                </div>
-              )}
+              ) : null}
             </div>
           </motion.div>
         </motion.div>
