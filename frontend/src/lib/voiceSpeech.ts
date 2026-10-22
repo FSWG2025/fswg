@@ -35,6 +35,27 @@ let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null;
 let speakToken = 0;
 let chromeKeepAlive: number | null = null;
 let unlocked = false;
+let speaking = false;
+const speakingListeners = new Set<(active: boolean) => void>();
+
+function setSpeaking(active: boolean): void {
+  if (speaking === active) return;
+  speaking = active;
+  speakingListeners.forEach((fn) => fn(active));
+}
+
+/** Subscribe to TTS speaking state (for cinematic background while reading). */
+export function subscribeSpeechSpeaking(listener: (active: boolean) => void): () => void {
+  speakingListeners.add(listener);
+  listener(speaking);
+  return () => {
+    speakingListeners.delete(listener);
+  };
+}
+
+export function isSpeechSpeaking(): boolean {
+  return speaking;
+}
 
 export function isTouchDevice(): boolean {
   if (typeof window === "undefined") return false;
@@ -184,6 +205,7 @@ export function stopSpeaking(): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   speakToken += 1;
   clearChromeKeepAlive();
+  setSpeaking(false);
   try {
     window.speechSynthesis.cancel();
   } catch {
@@ -210,10 +232,25 @@ function attachUtterance(
   utterance.pitch = 1.02;
   utterance.volume = 1;
 
-  utterance.onend = () => clearChromeKeepAlive();
-  utterance.onerror = () => clearChromeKeepAlive();
+  utterance.onstart = () => {
+    if (token === speakToken) setSpeaking(true);
+  };
+  utterance.onend = () => {
+    clearChromeKeepAlive();
+    if (token === speakToken) setSpeaking(false);
+  };
+  utterance.onerror = () => {
+    clearChromeKeepAlive();
+    if (token === speakToken) setSpeaking(false);
+  };
 
   window.speechSynthesis.speak(utterance);
+  // Some engines skip onstart — mark speaking shortly after queue
+  window.setTimeout(() => {
+    if (token === speakToken && window.speechSynthesis.speaking) {
+      setSpeaking(true);
+    }
+  }, 60);
 
   try {
     window.speechSynthesis.resume();
@@ -227,6 +264,7 @@ function attachUtterance(
     chromeKeepAlive = window.setInterval(() => {
       if (token !== speakToken || !window.speechSynthesis.speaking) {
         clearChromeKeepAlive();
+        if (token === speakToken) setSpeaking(false);
         return;
       }
       window.speechSynthesis.pause();

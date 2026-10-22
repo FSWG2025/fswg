@@ -100,52 +100,112 @@
     @apply ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#12213E] text-white;
   }
 
-  /* Voice Ask answer panel — warm brand cinematic wash */
+  /* Voice Ask — warm brown / sky blue / white cinematic wash */
   .voice-ask-cinematic {
     position: relative;
     isolation: isolate;
     overflow: hidden;
     background:
-      radial-gradient(ellipse 90% 80% at 12% 0%, rgba(198, 146, 89, 0.28), transparent 55%),
-      radial-gradient(ellipse 70% 60% at 100% 100%, rgba(243, 223, 199, 0.55), transparent 50%),
-      linear-gradient(165deg, #fff8f0 0%, #f4f7fb 48%, #eef2f6 100%);
+      radial-gradient(ellipse 85% 70% at 8% 0%, rgba(198, 146, 89, 0.32), transparent 55%),
+      radial-gradient(ellipse 75% 65% at 100% 10%, rgba(164, 201, 232, 0.45), transparent 52%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, rgba(243, 223, 199, 0.5), transparent 48%),
+      linear-gradient(160deg, #ffffff 0%, #e8f3fb 42%, #f8f1e8 100%);
   }
   .voice-ask-cinematic::before {
     content: "";
     pointer-events: none;
     position: absolute;
-    inset: -40%;
+    inset: -45%;
     z-index: 0;
     background:
-      radial-gradient(circle at 30% 40%, rgba(198, 146, 89, 0.22), transparent 42%),
-      radial-gradient(circle at 70% 60%, rgba(18, 33, 62, 0.08), transparent 45%),
-      radial-gradient(circle at 50% 20%, rgba(243, 223, 199, 0.35), transparent 40%);
-    animation: voice-ask-cinematic-drift 14s ease-in-out infinite alternate;
+      radial-gradient(circle at 25% 35%, rgba(198, 146, 89, 0.28), transparent 40%),
+      radial-gradient(circle at 75% 30%, rgba(125, 180, 220, 0.35), transparent 42%),
+      radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.7), transparent 38%);
+    animation: voice-ask-cinematic-drift 12s ease-in-out infinite alternate;
   }
   .voice-ask-cinematic > * {
     position: relative;
     z-index: 1;
   }
+
+  /* Radio-frequency bars — active while TTS is speaking */
+  .voice-ask-freq {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 10% 12%;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .voice-ask-cinematic.is-speaking .voice-ask-freq {
+    opacity: 0.9;
+  }
+  .voice-ask-freq span {
+    flex: 1 1 0;
+    max-width: 7px;
+    min-height: 8%;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      rgba(198, 146, 89, 0.75) 0%,
+      rgba(125, 180, 220, 0.55) 55%,
+      rgba(255, 255, 255, 0.35) 100%
+    );
+    transform-origin: bottom center;
+    animation: voice-ask-freq-pulse 0.9s ease-in-out infinite alternate;
+  }
+  .voice-ask-freq span:nth-child(odd) {
+    animation-duration: 0.7s;
+  }
+  .voice-ask-freq span:nth-child(3n) {
+    animation-duration: 1.15s;
+  }
+  .voice-ask-freq span:nth-child(4n) {
+    animation-duration: 0.85s;
+  }
+  .voice-ask-cinematic.is-speaking::before {
+    animation-duration: 5s;
+  }
 }
 
 @keyframes voice-ask-cinematic-drift {
   0% {
-    transform: translate3d(-4%, -2%, 0) scale(1);
-    opacity: 0.85;
+    transform: translate3d(-5%, -3%, 0) scale(1);
+    opacity: 0.8;
   }
   50% {
-    transform: translate3d(3%, 4%, 0) scale(1.06);
+    transform: translate3d(4%, 5%, 0) scale(1.08);
     opacity: 1;
   }
   100% {
-    transform: translate3d(5%, -3%, 0) scale(1.03);
-    opacity: 0.9;
+    transform: translate3d(6%, -4%, 0) scale(1.04);
+    opacity: 0.88;
+  }
+}
+
+@keyframes voice-ask-freq-pulse {
+  0% {
+    transform: scaleY(0.28);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 0.95;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-ask-cinematic::before {
-    animation: none;
+  .voice-ask-cinematic::before,
+  .voice-ask-freq span {
+    animation: none !important;
+  }
+  .voice-ask-cinematic.is-speaking .voice-ask-freq {
+    opacity: 0.35;
   }
 }
 

@@ -17,6 +17,7 @@ import {
   prefetchSpeechVoices,
   speakText,
   stopSpeaking,
+  subscribeSpeechSpeaking,
   unlockSpeechPlayback,
 } from "@/lib/voiceSpeech";
 import type { SiteSearchHit } from "@/lib/siteSearch";
@@ -30,6 +31,8 @@ type Props = {
 /** Keep answer pages short so the sheet stays ~40–45vh. */
 const PAGE_CHARS = 130;
 
+const FREQ_BARS = 18;
+
 export default function NavbarVoiceAskModal({
   open,
   onClose,
@@ -38,6 +41,7 @@ export default function NavbarVoiceAskModal({
   const [speakOn, setSpeakOn] = useState(true);
   const [page, setPage] = useState(0);
   const [heardForAnswer, setHeardForAnswer] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [touchUi] = useState(() => isTouchDevice());
   const {
     supported,
@@ -63,6 +67,8 @@ export default function NavbarVoiceAskModal({
     setPage(0);
     setHeardForAnswer(false);
   }, [answer?.answer]);
+
+  useEffect(() => subscribeSpeechSpeaking(setIsSpeaking), []);
 
   const handleClose = useCallback(() => {
     stop();
@@ -144,7 +150,7 @@ export default function NavbarVoiceAskModal({
             onClick={(e) => e.stopPropagation()}
             className={`relative flex h-[45vh] max-h-[45vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] shadow-[0_24px_80px_rgba(18,33,62,0.28)] sm:rounded-[28px] ${
               hasAnswer
-                ? "voice-ask-cinematic"
+                ? `voice-ask-cinematic${isSpeaking ? " is-speaking" : ""}`
                 : "bg-white"
             }`}
           >
@@ -213,7 +219,19 @@ export default function NavbarVoiceAskModal({
               </div>
 
               {hasAnswer ? (
-                <div className="voice-ask-cinematic mt-2 flex min-h-0 w-full flex-1 flex-col rounded-[18px] p-3 ring-1 ring-[#C69259]/20">
+                <div
+                  className={`voice-ask-cinematic mt-2 flex min-h-0 w-full flex-1 flex-col rounded-[18px] p-3 ring-1 ring-[#C69259]/25 ${
+                    isSpeaking ? "is-speaking" : ""
+                  }`}
+                >
+                  <div className="voice-ask-freq" aria-hidden>
+                    {Array.from({ length: FREQ_BARS }, (_, i) => (
+                      <span
+                        key={i}
+                        style={{ animationDelay: `${(i % 7) * 0.08}s` }}
+                      />
+                    ))}
+                  </div>
                   {speakOn ? (
                     <button
                       type="button"
