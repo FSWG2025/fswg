@@ -61,7 +61,7 @@ export default function NavbarVoiceAskModal({
   const liveText = interim || transcript;
 
   const statusLabel = listening
-    ? "Listening…"
+    ? "Listening… pause when you are done"
     : processing
       ? "Finding an answer…"
       : supported
@@ -146,7 +146,7 @@ export default function NavbarVoiceAskModal({
                   </>
                 )}
 
-                <motion.button
+                <button
                   type="button"
                   disabled={!supported || processing}
                   onClick={() => {
@@ -159,74 +159,34 @@ export default function NavbarVoiceAskModal({
                       startListening();
                     }
                   }}
-                  whileTap={{ scale: 0.94 }}
-                  animate={
+                  className={`relative z-10 flex h-24 w-24 items-center justify-center rounded-full text-white transition-colors disabled:opacity-50 ${
                     listening
-                      ? {
-                          scale: [1, 1.04, 1],
-                          boxShadow: [
-                            "0 12px 40px rgba(198,146,89,0.35)",
-                            "0 16px 48px rgba(198,146,89,0.55)",
-                            "0 12px 40px rgba(198,146,89,0.35)",
-                          ],
-                        }
-                      : { scale: 1 }
-                  }
-                  transition={
-                    listening
-                      ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
-                      : { type: "spring", stiffness: 400, damping: 24 }
-                  }
-                  className={`relative z-10 flex h-24 w-24 items-center justify-center rounded-full text-white disabled:opacity-50 ${
-                    listening ? "bg-[#C69259]" : "bg-[#12213E]"
+                      ? "bg-[#C69259] shadow-[0_12px_40px_rgba(198,146,89,0.4)]"
+                      : "bg-[#12213E] shadow-[0_12px_40px_rgba(18,33,62,0.28)]"
                   }`}
                   aria-pressed={listening}
                   aria-label={listening ? "Stop listening" : "Start listening"}
                 >
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.span
-                      key={processing ? "spin" : listening ? "live" : supported ? "mic" : "off"}
-                      initial={{ opacity: 0, scale: 0.6, rotate: -12 }}
-                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                      exit={{ opacity: 0, scale: 0.6, rotate: 12 }}
-                      transition={{ duration: 0.18 }}
-                      className="flex"
-                    >
-                      {processing ? (
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                      ) : supported ? (
-                        <Mic className="h-8 w-8" />
-                      ) : (
-                        <MicOff className="h-8 w-8" />
-                      )}
-                    </motion.span>
-                  </AnimatePresence>
-                </motion.button>
+                  {processing ? (
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  ) : supported ? (
+                    <Mic className="h-8 w-8" />
+                  ) : (
+                    <MicOff className="h-8 w-8" />
+                  )}
+                </button>
               </div>
 
-              <motion.p
-                key={statusLabel}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-2 text-center text-sm font-semibold text-[#12213E]"
-              >
+              <p className="mt-2 text-center text-sm font-semibold text-[#12213E]">
                 {statusLabel}
-              </motion.p>
+              </p>
 
-              <AnimatePresence>
-                {liveText ? (
-                  <motion.p
-                    key={liveText}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="mt-3 max-w-sm text-center text-sm leading-relaxed text-[#6B7280]"
-                  >
-                    “{liveText}
-                    {interim ? "…" : ""}”
-                  </motion.p>
-                ) : null}
-              </AnimatePresence>
+              {liveText ? (
+                <p className="mt-3 max-w-sm text-center text-sm leading-relaxed text-[#6B7280]">
+                  “{liveText}
+                  {interim ? "…" : ""}”
+                </p>
+              ) : null}
 
               {error ? (
                 <motion.p

@@ -21,11 +21,15 @@ export type VoiceAskStatus =
 
 type Options = {
   speakAnswers?: boolean;
+  /** Pause length before auto-answering (ms). Default 2000. */
+  silenceMs?: number;
   onAnswer?: (answer: VoiceAnswer) => void;
 };
 
+const DEFAULT_SILENCE_MS = 2000;
+
 export function useVoiceAsk(options: Options = {}) {
-  const { speakAnswers = true, onAnswer } = options;
+  const { speakAnswers = true, silenceMs = DEFAULT_SILENCE_MS, onAnswer } = options;
   const [supported] = useState(() => isSpeechRecognitionSupported());
   const [status, setStatus] = useState<VoiceAskStatus>(() =>
     isSpeechRecognitionSupported() ? "idle" : "unsupported",
@@ -38,21 +42,38 @@ export function useVoiceAsk(options: Options = {}) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const activeRef = useRef(false);
   const finalRef = useRef("");
+  const interimRef = useRef("");
+  const silenceTimerRef = useRef<number | null>(null);
+  const answeredRef = useRef(false);
   const speakRef = useRef(speakAnswers);
   const onAnswerRef = useRef(onAnswer);
+  const silenceMsRef = useRef(silenceMs);
   speakRef.current = speakAnswers;
   onAnswerRef.current = onAnswer;
+  silenceMsRef.current = silenceMs;
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current != null) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }, []);
 
   const applyAnswer = useCallback((text: string) => {
+    if (answeredRef.current) return;
     const cleaned = text.trim();
     if (!cleaned) {
       setError("I did not catch that. Tap the mic and try again.");
       setStatus("error");
       return;
     }
+    answeredRef.current = true;
+    activeRef.current = false;
+    clearSilenceTimer();
     setStatus("processing");
     setTranscript(cleaned);
     setInterim("");
+    interimRef.current = "";
     const result = answerVoiceQuestion(cleaned);
     setAnswer(result);
     setStatus("answered");
@@ -60,21 +81,24 @@ export function useVoiceAsk(options: Options = {}) {
     if (speakRef.current) {
       speakText(result.answer);
     }
-  }, []);
+  }, [clearSilenceTimer]);
 
   const stop = useCallback(() => {
-    // Keep activeRef true so onend can still apply the final transcript.
+    clearSilenceTimer();
     try {
       recognitionRef.current?.stop();
     } catch {
       /* already stopped */
     }
-  }, []);
+  }, [clearSilenceTimer]);
 
   const reset = useCallback(() => {
     stopSpeaking();
+    clearSilenceTimer();
     activeRef.current = false;
+    answeredRef.current = false;
     finalRef.current = "";
+    interimRef.current = "";
     try {
       recognitionRef.current?.abort();
     } catch {
@@ -85,13 +109,16 @@ export function useVoiceAsk(options: Options = {}) {
     setAnswer(null);
     setError(null);
     setStatus(supported ? "idle" : "unsupported");
-  }, [supported]);
+  }, [clearSilenceTimer, supported]);
 
   const askTyped = useCallback(
     (text: string) => {
       stopSpeaking();
+      clearSilenceTimer();
       activeRef.current = false;
+      answeredRef.current = false;
       finalRef.current = "";
+      interimRef.current = "";
       try {
         recognitionRef.current?.abort();
       } catch {
@@ -100,7 +127,7 @@ export function useVoiceAsk(options: Options = {}) {
       setError(null);
       applyAnswer(text);
     },
-    [applyAnswer],
+    [applyAnswer, clearSilenceTimer],
   );
 
   const startListening = useCallback(() => {
@@ -113,14 +140,18 @@ export function useVoiceAsk(options: Options = {}) {
     }
 
     stopSpeaking();
+    clearSilenceTimer();
     setError(null);
     setInterim("");
     setAnswer(null);
     finalRef.current = "";
+    interimRef.current = "";
+    answeredRef.current = false;
 
+    // continuous + silence timer: answer after ~2s pause
     const recognition = createSpeechRecognition({
       lang: "en-CA",
-      continuous: false,
+      continuous: true,
       interimResults: true,
     });
     if (!recognition) {
@@ -131,11 +162,27 @@ export function useVoiceAsk(options: Options = {}) {
     recognitionRef.current = recognition;
     activeRef.current = true;
 
+    const scheduleSilenceStop = () => {
+      clearSilenceTimer();
+      silenceTimerRef.current = window.setTimeout(() => {
+        const text = `${finalRef.current} ${interimRef.current}`.trim();
+        if (!text || !activeRef.current || answeredRef.current) return;
+        // Prefer finalizing via stop → onend; also apply immediately if needed
+        try {
+          recognitionRef.current?.stop();
+        } catch {
+          applyAnswer(text);
+        }
+      }, silenceMsRef.current);
+    };
+
     recognition.onstart = () => {
       setStatus("listening");
     };
 
     recognition.onresult = (event) => {
+      if (!activeRef.current || answeredRef.current) return;
+
       let interimText = "";
       let finalText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -147,21 +194,36 @@ export function useVoiceAsk(options: Options = {}) {
         finalRef.current = `${finalRef.current} ${finalText}`.trim();
         setTranscript(finalRef.current);
       }
+      interimRef.current = interimText;
       setInterim(interimText);
+
+      // Any speech activity resets the 2s pause clock
+      if (finalText || interimText) {
+        scheduleSilenceStop();
+      }
     };
 
     recognition.onerror = (event) => {
-      activeRef.current = false;
+      clearSilenceTimer();
       const code = event.error || "unknown";
       if (code === "aborted") {
-        setStatus("idle");
+        activeRef.current = false;
+        if (!answeredRef.current) setStatus("idle");
         return;
       }
+      // continuous sessions sometimes emit no-speech between phrases — ignore if we have text
       if (code === "no-speech") {
+        const text = `${finalRef.current} ${interimRef.current}`.trim();
+        if (text) {
+          applyAnswer(text);
+          return;
+        }
+        activeRef.current = false;
         setError("No speech detected. Tap the mic and ask again.");
         setStatus("error");
         return;
       }
+      activeRef.current = false;
       if (code === "not-allowed" || code === "service-not-allowed") {
         setError(
           "Microphone permission is blocked. Allow mic access, or type your question.",
@@ -175,31 +237,36 @@ export function useVoiceAsk(options: Options = {}) {
     };
 
     recognition.onend = () => {
+      clearSilenceTimer();
       const wasActive = activeRef.current;
       activeRef.current = false;
-      const text = finalRef.current.trim();
-      if (wasActive && text) {
+      const text = `${finalRef.current} ${interimRef.current}`.trim();
+      if (wasActive && text && !answeredRef.current) {
         applyAnswer(text);
         return;
       }
-      setStatus((prev) => {
-        if (prev === "listening" || prev === "processing") return "idle";
-        return prev;
-      });
+      if (!answeredRef.current) {
+        setStatus((prev) => {
+          if (prev === "listening" || prev === "processing") return "idle";
+          return prev;
+        });
+      }
     };
 
     try {
       recognition.start();
     } catch {
+      clearSilenceTimer();
       setError("Could not start the microphone. Try again in a moment.");
       setStatus("error");
       activeRef.current = false;
     }
-  }, [applyAnswer, supported]);
+  }, [applyAnswer, clearSilenceTimer, supported]);
 
   useEffect(() => {
     return () => {
       activeRef.current = false;
+      clearSilenceTimer();
       stopSpeaking();
       try {
         recognitionRef.current?.abort();
@@ -207,7 +274,7 @@ export function useVoiceAsk(options: Options = {}) {
         /* ignore */
       }
     };
-  }, []);
+  }, [clearSilenceTimer]);
 
   return {
     supported,
