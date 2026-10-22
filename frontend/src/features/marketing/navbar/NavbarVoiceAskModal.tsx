@@ -12,7 +12,13 @@ import {
 } from "lucide-react";
 import { useVoiceAsk } from "@/hooks/useVoiceAsk";
 import { paginateText } from "@/lib/paginateText";
-import { prefetchSpeechVoices, stopSpeaking } from "@/lib/voiceSpeech";
+import {
+  isTouchDevice,
+  prefetchSpeechVoices,
+  speakText,
+  stopSpeaking,
+  unlockSpeechPlayback,
+} from "@/lib/voiceSpeech";
 import type { SiteSearchHit } from "@/lib/siteSearch";
 
 type Props = {
@@ -28,6 +34,8 @@ export default function NavbarVoiceAskModal({
 }: Props) {
   const [speakOn, setSpeakOn] = useState(true);
   const [page, setPage] = useState(0);
+  const [heardForAnswer, setHeardForAnswer] = useState(false);
+  const [touchUi] = useState(() => isTouchDevice());
   const {
     supported,
     status,
@@ -49,6 +57,7 @@ export default function NavbarVoiceAskModal({
 
   useEffect(() => {
     setPage(0);
+    setHeardForAnswer(false);
   }, [answer?.answer]);
 
   const handleClose = useCallback(() => {
@@ -56,6 +65,7 @@ export default function NavbarVoiceAskModal({
     stopSpeaking();
     reset();
     setPage(0);
+    setHeardForAnswer(false);
     onClose();
   }, [onClose, reset, stop]);
 
@@ -64,6 +74,7 @@ export default function NavbarVoiceAskModal({
       reset();
       stopSpeaking();
       setPage(0);
+      setHeardForAnswer(false);
       return;
     }
     prefetchSpeechVoices();
@@ -74,10 +85,16 @@ export default function NavbarVoiceAskModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, reset, handleClose]);
 
+  const playAnswer = useCallback(() => {
+    if (!answer?.answer || !speakOn) return;
+    // User gesture path — required on iPhone Safari / many mobile Chrome builds
+    speakText(answer.answer, { fromUserGesture: true });
+    setHeardForAnswer(true);
+  }, [answer?.answer, speakOn]);
+
   const listening = status === "listening";
   const processing = status === "processing";
   const liveText = interim || transcript;
-
   const statusLabel = listening
     ? "Listening… pause when you are done"
     : processing
@@ -141,15 +158,19 @@ export default function NavbarVoiceAskModal({
                   type="button"
                   disabled={!supported || processing}
                   onClick={() => {
-                    if (listening) stop();
-                    else {
-                      if (answer) {
-                        stopSpeaking();
-                        reset();
-                        setPage(0);
-                      }
-                      startListening();
+                    // Unlock TTS inside this tap — critical for iPhone / mobile Chrome
+                    unlockSpeechPlayback();
+                    if (listening) {
+                      stop();
+                      return;
                     }
+                    if (answer) {
+                      stopSpeaking();
+                      reset();
+                      setPage(0);
+                      setHeardForAnswer(false);
+                    }
+                    startListening();
                   }}
                   className={`flex h-20 w-20 items-center justify-center rounded-full text-white disabled:opacity-50 sm:h-24 sm:w-24 ${
                     listening || processing ? "bg-[#C69259]" : "bg-[#12213E]"
@@ -186,12 +207,31 @@ export default function NavbarVoiceAskModal({
 
               {answer && pageCount > 0 ? (
                 <div className="mt-5 w-full shrink-0 rounded-[22px] bg-[#F4F7FB] p-4 sm:p-5">
-                  <p
-                    key={currentPage}
-                    className="min-h-[4.5rem] text-sm leading-relaxed text-[#374151]"
+                  {speakOn ? (
+                    <button
+                      type="button"
+                      onClick={playAnswer}
+                      className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#12213E] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(18,33,62,0.22)]"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                      {touchUi && !heardForAnswer
+                        ? "Tap to hear your answer"
+                        : heardForAnswer
+                          ? "Hear again"
+                          : "Hear answer"}
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={playAnswer}
+                    className="w-full text-left"
+                    aria-label="Play spoken answer"
                   >
-                    {pages[currentPage]}
-                  </p>
+                    <p className="min-h-[4.5rem] text-sm leading-relaxed text-[#374151]">
+                      {pages[currentPage]}
+                    </p>
+                  </button>
 
                   {pageCount > 1 ? (
                     <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#E4EFF6] pt-3">
@@ -205,7 +245,10 @@ export default function NavbarVoiceAskModal({
                         <ArrowLeft className="h-3.5 w-3.5" />
                         Prev
                       </button>
-                      <div className="flex items-center gap-1.5" aria-label={`Page ${currentPage + 1} of ${pageCount}`}>
+                      <div
+                        className="flex items-center gap-1.5"
+                        aria-label={`Page ${currentPage + 1} of ${pageCount}`}
+                      >
                         {pages.map((_, i) => (
                           <button
                             key={i}

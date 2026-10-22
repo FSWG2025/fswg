@@ -84,10 +84,16 @@ export function useVoiceAsk(options: Options = {}) {
     setStatus("answered");
     onAnswerRef.current?.(result);
     if (speakRef.current) {
-      // Let the recognition session finish tearing down, then speak
+      // Wait for the mic session to fully release, then try TTS.
+      // Mobile Safari/Chrome often still need a tap — UI shows "Tap to hear".
+      const delay = /iPhone|iPad|iPod|Android/i.test(
+        typeof navigator !== "undefined" ? navigator.userAgent : "",
+      )
+        ? 350
+        : 200;
       window.setTimeout(() => {
         if (speakRef.current) speakText(result.answer);
-      }, 180);
+      }, delay);
     }
   }, [clearSilenceTimer]);
 

@@ -1,4 +1,4 @@
-/** Reliable calm female TTS for Voice Ask (Chrome-safe). */
+/** Calm female TTS for Voice Ask — desktop + mobile (Chrome / Safari). */
 
 const PREFERRED_FEMALE = [
   "microsoft aria",
@@ -34,6 +34,24 @@ let cachedVoice: SpeechSynthesisVoice | null = null;
 let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null;
 let speakToken = 0;
 let chromeKeepAlive: number | null = null;
+let unlocked = false;
+
+export function isTouchDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    navigator.maxTouchPoints > 0 ||
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  );
+}
+
+export function isIOSDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
 
 function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   if (typeof window === "undefined" || !window.speechSynthesis) {
@@ -53,7 +71,7 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
       resolve(synth.getVoices());
     };
     synth.addEventListener("voiceschanged", done);
-    window.setTimeout(() => resolve(synth.getVoices()), 400);
+    window.setTimeout(() => resolve(synth.getVoices()), 500);
   });
 
   return voicesReady;
@@ -85,23 +103,74 @@ function scoreVoice(voice: SpeechSynthesisVoice): number {
   return score;
 }
 
-async function pickCalmFemaleVoice(): Promise<SpeechSynthesisVoice | null> {
-  if (cachedVoice) return cachedVoice;
-  const voices = await loadVoices();
+function pickFromList(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices.length) return null;
-
   const ranked = [...voices]
     .map((v) => ({ v, score: scoreVoice(v) }))
     .filter((row) => row.score > 0)
     .sort((a, b) => b.score - a.score);
+  return ranked[0]?.v ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+}
 
-  cachedVoice = ranked[0]?.v ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+async function pickCalmFemaleVoice(): Promise<SpeechSynthesisVoice | null> {
+  if (cachedVoice) return cachedVoice;
+  const voices = await loadVoices();
+  cachedVoice = pickFromList(voices);
+  return cachedVoice;
+}
+
+function syncVoice(): SpeechSynthesisVoice | null {
+  if (cachedVoice) return cachedVoice;
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+  cachedVoice = pickFromList(window.speechSynthesis.getVoices());
   return cachedVoice;
 }
 
 /** Warm the voice list so the first answer can speak without delay. */
 export function prefetchSpeechVoices(): void {
   void pickCalmFemaleVoice();
+}
+
+/**
+ * Must run inside a user tap/click (e.g. mic button).
+ * Unlocks Web Speech on iOS / mobile Chrome so later answers can play.
+ */
+export function unlockSpeechPlayback(): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  prefetchSpeechVoices();
+
+  try {
+    // Prime any AudioContext policies on Android Chrome
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      if (ctx.state === "suspended") void ctx.resume();
+      void ctx.close();
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const warm = new SpeechSynthesisUtterance(" ");
+    warm.volume = 0;
+    warm.rate = 1;
+    warm.pitch = 1;
+    const voice = syncVoice();
+    if (voice) {
+      warm.voice = voice;
+      warm.lang = voice.lang;
+    } else {
+      warm.lang = "en-US";
+    }
+    // Do NOT cancel — canceling during the gesture can undo the unlock on iOS
+    window.speechSynthesis.speak(warm);
+    unlocked = true;
+  } catch {
+    /* ignore */
+  }
 }
 
 function clearChromeKeepAlive(): void {
@@ -115,70 +184,122 @@ export function stopSpeaking(): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   speakToken += 1;
   clearChromeKeepAlive();
-  window.speechSynthesis.cancel();
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    /* ignore */
+  }
+}
+
+function attachUtterance(
+  cleaned: string,
+  voice: SpeechSynthesisVoice | null,
+  token: number,
+): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  if (token !== speakToken) return;
+
+  const utterance = new SpeechSynthesisUtterance(cleaned);
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang || "en-CA";
+  } else {
+    utterance.lang = isIOSDevice() ? "en-US" : "en-CA";
+  }
+  utterance.rate = 0.96;
+  utterance.pitch = 1.02;
+  utterance.volume = 1;
+
+  utterance.onend = () => clearChromeKeepAlive();
+  utterance.onerror = () => clearChromeKeepAlive();
+
+  window.speechSynthesis.speak(utterance);
+
+  try {
+    window.speechSynthesis.resume();
+  } catch {
+    /* ignore */
+  }
+
+  // pause/resume keep-alive helps desktop Chrome; it can kill speech on iOS
+  if (!isIOSDevice()) {
+    clearChromeKeepAlive();
+    chromeKeepAlive = window.setInterval(() => {
+      if (token !== speakToken || !window.speechSynthesis.speaking) {
+        clearChromeKeepAlive();
+        return;
+      }
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }, 9000);
+  }
 }
 
 /**
- * Speak with a calm, natural English female voice when available.
- * Uses a short delay after cancel so Chrome actually plays audio.
+ * Speak answer text. Prefer calling from a tap on mobile.
+ * Also attempts auto-play after mic unlock (works on many Android devices).
  */
-export function speakText(text: string): void {
+export function speakText(text: string, opts?: { fromUserGesture?: boolean }): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   const cleaned = text.replace(/\s+/g, " ").trim();
   if (!cleaned) return;
 
   const token = ++speakToken;
   clearChromeKeepAlive();
-  window.speechSynthesis.cancel();
+
+  // Avoid cancel on iOS unless starting a fresh user-gesture speak
+  if (!isIOSDevice() || opts?.fromUserGesture) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const voiceNow = syncVoice();
+
+  const run = (voice: SpeechSynthesisVoice | null) => {
+    if (token !== speakToken) return;
+
+    // Desktop Chrome: tiny delay after cancel helps playback
+    // Mobile user gesture: speak ASAP (same tick / next frame)
+    const delay = opts?.fromUserGesture ? 0 : isTouchDevice() ? 250 : 80;
+
+    window.setTimeout(() => {
+      if (token !== speakToken) return;
+      if (!isIOSDevice()) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
+      attachUtterance(cleaned, voice, token);
+
+      // If nothing started (common on iOS after mic), retry once shortly
+      window.setTimeout(() => {
+        if (token !== speakToken) return;
+        if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+          attachUtterance(cleaned, voice || syncVoice(), token);
+        }
+      }, 400);
+    }, delay);
+  };
+
+  if (voiceNow || opts?.fromUserGesture) {
+    run(voiceNow);
+    void pickCalmFemaleVoice().then((v) => {
+      if (v && !voiceNow) cachedVoice = v;
+    });
+    return;
+  }
 
   void pickCalmFemaleVoice().then((voice) => {
     if (token !== speakToken) return;
-
-    const start = () => {
-      if (token !== speakToken) return;
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
-
-      // Cancel again just before speak; Chrome needs a beat after cancel.
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(cleaned);
-      if (voice) {
-        utterance.voice = voice;
-        utterance.lang = voice.lang || "en-CA";
-      } else {
-        utterance.lang = "en-CA";
-      }
-      utterance.rate = 0.96;
-      utterance.pitch = 1.02;
-      utterance.volume = 1;
-
-      utterance.onend = () => {
-        clearChromeKeepAlive();
-      };
-      utterance.onerror = () => {
-        clearChromeKeepAlive();
-      };
-
-      window.speechSynthesis.speak(utterance);
-      // Chrome can start in a paused state after cancel / mic use
-      try {
-        window.speechSynthesis.resume();
-      } catch {
-        /* ignore */
-      }
-
-      clearChromeKeepAlive();
-      chromeKeepAlive = window.setInterval(() => {
-        if (token !== speakToken || !window.speechSynthesis.speaking) {
-          clearChromeKeepAlive();
-          return;
-        }
-        // Known Chrome workaround to keep long utterances alive
-        window.speechSynthesis.pause();
-        window.speechSynthesis.resume();
-      }, 9000);
-    };
-
-    window.setTimeout(start, 120);
+    run(voice);
   });
+}
+
+export function isSpeechUnlocked(): boolean {
+  return unlocked;
 }
