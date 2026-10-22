@@ -2,6 +2,8 @@
 
 God-mode operations surface for First Step Wealth Group. Route: `/dashboard/super`. APIs: `/api/super/*`.
 
+See also: [docs index](./README.md) · [API — Super](./API.md#super-admin--apisuper) · [Security](./SECURITY.md) · [Roles](./ROLES.md)
+
 **No seed or demo data is shipped.** Bootstrap a real account only.
 
 ## Bootstrap the first super admin

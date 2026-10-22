@@ -9,20 +9,32 @@ A full‑stack financial services platform connecting newcomers, immigrants, and
 ## Table of Contents
 
 - [Overview](#-overview)
+- [Documentation](#documentation)
 - [Features](#-features)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
-- [Environment Variables](#-environment-variables)
-- [API Documentation](#-api-documentation)
-- [Database Models](#-database-models)
-- [Authentication Flow](#-authentication-flow)
-- [Frontend Architecture](#-frontend-architecture)
-- [Design System](#-design-system)
-- [Deployment](#-deployment)
 - [Contributing](#-contributing)
 - [License](#-license)
+
+---
+
+## Documentation
+
+Full platform docs live in [`docs/`](docs/README.md):
+
+| Doc | Topic |
+|-----|--------|
+| [API.md](docs/API.md) | HTTP API reference |
+| [SUPER_ADMIN.md](docs/SUPER_ADMIN.md) | Command Center bootstrap & playbooks |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | GitHub → Render + Vercel |
+| [ENVIRONMENT.md](docs/ENVIRONMENT.md) | Env vars |
+| [AUTHENTICATION.md](docs/AUTHENTICATION.md) | JWT, sessions, impersonation |
+| [ROLES.md](docs/ROLES.md) | Roles & permission groups |
+| [SECURITY.md](docs/SECURITY.md) | Hardening & audit |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Monorepo layout |
+| [ADMIN_ALERTS.md](docs/ADMIN_ALERTS.md) | Admin Web Push / socket alerts |
 
 ---
 
