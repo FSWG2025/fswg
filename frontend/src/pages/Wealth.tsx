@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
 import WealthProjectionSection from "@/components/home/WealthProjectionSection";
+import WealthPathSection from "@/components/home/WealthPathSection";
+import WealthClaritySection from "@/components/home/WealthClaritySection";
 
 const Wealth = () => {
   return (
@@ -42,6 +44,8 @@ const Wealth = () => {
           </motion.div>
         </section>
         <WealthProjectionSection />
+        <WealthPathSection />
+        <WealthClaritySection />
       </main>
     </>
   );
