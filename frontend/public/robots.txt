@@ -1,0 +1,13 @@
+# First Step Wealth Group — https://firststepwealthgroup.ca
+User-agent: *
+Allow: /
+
+# App / auth surfaces (thin value for search)
+Disallow: /dashboard
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /app/
+
+Sitemap: https://firststepwealthgroup.ca/sitemap.xml

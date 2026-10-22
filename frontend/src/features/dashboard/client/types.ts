@@ -1,0 +1,35 @@
+import type { NavigateFunction } from "react-router";
+
+export type ClientFeaturePanelsProps = {
+  navigate: NavigateFunction;
+  readinessItems: { id: string; label: string }[];
+  readiness: Record<string, boolean>;
+  setReadiness: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  readinessPct: number;
+  monthlySave: number;
+  setMonthlySave: (n: number) => void;
+  years: number;
+  setYears: (n: number) => void;
+  rate: number;
+  setRate: (n: number) => void;
+  wealthFuture: number;
+  insuranceOptions: { id: string; label: string; desc: string }[];
+  insurancePick: string[];
+  setInsurancePick: (v: string[]) => void;
+  prepItems: { id: string; label: string }[];
+  prep: Record<string, boolean>;
+  setPrep: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  posts: any[];
+  docItems: { id: string; label: string }[];
+  docs: Record<string, boolean>;
+  setDocs: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  goalOptions: { id: string; label: string; icon: any }[];
+  goals: string[];
+  setGoals: (v: string[]) => void;
+  user: any;
+  stats: any;
+  onBook: () => void;
+  shareReferral: () => void;
+  toggleList: (list: string[], setList: (v: string[]) => void, id: string) => void;
+  resources: { title: string; href: string; blurb: string }[];
+};
