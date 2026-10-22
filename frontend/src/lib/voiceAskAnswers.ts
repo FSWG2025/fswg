@@ -1,5 +1,4 @@
 import { allFaqs, type FAQCategory } from "@/features/marketing/faq/faqData";
-import searchIndex from "@/lib/searchIndex";
 import { searchSiteIndex, type SiteSearchHit } from "@/lib/siteSearch";
 
 export type VoiceAnswerConfidence = "high" | "medium" | "low";
@@ -316,53 +315,74 @@ function scoreItem(item: KnowledgeItem, queryTokens: string[], raw: string): num
   return score;
 }
 
+const ON_TOPIC_RE =
+  /\b(rent|rental|guarantee|guarantor|landlord|housing|tenant|credit|newcomer|immigrant|insur(?:ance|e)?|wealth|invest(?:ing|ment)?|mortgage|real\s*estate|advisor|tfsa|rrsp|saving|compound|consult|first\s*step|fswg|canada|home\s*buy|debt|loan|policy|coverage|blog|testimonial|account|login|register|dashboard|privacy|fee|discovery|whatsapp|financial|money|budget|underwrit|application|document\s*vault|wealth\s*studio|calculator)\b/i;
+
+const OFF_TOPIC_RE =
+  /\b(recipe|cook(?:ing)?|football|soccer|nba|nhl|mlb|cricket|movie|film|celebrity|netflix|spotify|weather|horoscope|zodiac|joke|poem|lyrics|homework|essay|chatgpt|write\s+code|programming|python|javascript|bitcoin|crypto\s*price|stock\s*tip|gambling|casino|dating|girlfriend|boyfriend|trump|biden|election|war|politics|medical\s*diagnos|prescribe|drug|weapon|hack(?:ing)?)\b/i;
+
+const REFUSAL =
+  "I do not have an answer to that question. I am only able to help with First Step Wealth Group topics such as rental guarantee, insurance, real estate, wealth education, newcomers support, and getting started on this website. Please ask something related to those areas.";
+
 function relatedFor(question: string, fallbackQuery: string): SiteSearchHit[] {
   const hits = searchSiteIndex(question, 8);
   if (hits.length >= 3) return hits;
   return searchSiteIndex(fallbackQuery, 8);
 }
 
+function refusalAnswer(question: string): VoiceAnswer {
+  return {
+    question,
+    answer: REFUSAL,
+    matchedQuestion: "Outside our topics",
+    category: "About",
+    confidence: "low",
+    related: relatedFor(
+      "rental guarantee insurance wealth",
+      "rental guarantee insurance wealth",
+    ),
+  };
+}
+
+function isOnTopicQuestion(raw: string, bestScore: number): boolean {
+  if (isSiteOverviewIntent(raw)) return true;
+  const hasOnTopic = ON_TOPIC_RE.test(raw);
+  const hasOffTopic = OFF_TOPIC_RE.test(raw);
+  if (hasOffTopic && !hasOnTopic) return false;
+  if (hasOnTopic) return true;
+  // Strong knowledge match implies it is about our content
+  if (bestScore >= 30) return true;
+  return false;
+}
+
 function synthesizeFromIndex(question: string): VoiceAnswer | null {
   const hits = searchSiteIndex(question, 8);
-  if (hits.length === 0) {
-    // Broad browse of static index titles when query is very vague
-    const broad = searchIndex
-      .filter((item) => item.type === "page" || item.type === "section")
-      .slice(0, 6)
-      .map((item, i) => ({
-        id: `page-${i}`,
-        type: item.type,
-        title: item.title,
-        snippet: item.snippet,
-        url: item.url,
-        sectionId: item.sectionId,
-      }));
-    if (!broad.length) return null;
-    return {
-      question,
-      answer: `${SITE_OVERVIEW} Here are key areas you can open next.`,
-      matchedQuestion: "Website overview",
-      category: "About",
-      confidence: "medium",
-      related: broad,
-    };
-  }
+  if (hits.length === 0) return null;
 
-  const lines = hits
-    .slice(0, 4)
+  // Only synthesize when search hits are clearly relevant (FAQ / service / topic)
+  const useful = hits.filter((h) =>
+    ["faq", "topic", "insight", "service", "service_static", "page", "section"].includes(
+      h.type,
+    ),
+  );
+  if (useful.length === 0) return null;
+
+  const lines = useful
+    .slice(0, 3)
     .map((h) => `${h.title}: ${h.snippet}`)
     .join(" ");
 
   return {
     question,
-    answer: `Here is what I found on the First Step website related to your question. ${lines} You can open any related page below for full details, or ask about rental guarantee, insurance, real estate, or wealth.`,
-    confidence: hits.some((h) => h.type === "faq") ? "medium" : "low",
-    related: hits,
+    answer: `Here is what I found on the First Step website related to your question. ${lines} You can open a related page below for more detail.`,
+    confidence: useful.some((h) => h.type === "faq") ? "medium" : "low",
+    related: useful,
   };
 }
 
 /**
  * Match a spoken/typed question to site knowledge, FAQs, and pages.
+ * Off-topic questions are politely refused.
  * Fully client-side: no audio leaves the browser beyond the Web Speech API.
  */
 export function answerVoiceQuestion(input: string): VoiceAnswer {
@@ -399,8 +419,13 @@ export function answerVoiceQuestion(input: string): VoiceAnswer {
 
   const best = ranked[0];
   const second = ranked[1];
+  const bestScore = best?.score ?? 0;
 
-  // Require a real match so weak FAQ noise (e.g. "Not at all") cannot win
+  if (!isOnTopicQuestion(question, bestScore)) {
+    return refusalAnswer(question);
+  }
+
+  // Require a real match so weak FAQ noise cannot win
   if (best && best.score >= 22) {
     const margin = best.score - (second?.score ?? 0);
     const confidence: VoiceAnswerConfidence =
@@ -421,16 +446,10 @@ export function answerVoiceQuestion(input: string): VoiceAnswer {
   }
 
   const synthesized = synthesizeFromIndex(question);
-  if (synthesized) return synthesized;
+  if (synthesized && isOnTopicQuestion(question, 0)) return synthesized;
 
-  return {
-    question,
-    answer: SITE_OVERVIEW,
-    matchedQuestion: "What is this website all about?",
-    category: "About",
-    confidence: "medium",
-    related: relatedFor(question, "rental guarantee insurance wealth about"),
-  };
+  // On-topic but no solid match — still refuse rather than invent
+  return refusalAnswer(question);
 }
 
 export { speakText, stopSpeaking, prefetchSpeechVoices } from "@/lib/voiceSpeech";
