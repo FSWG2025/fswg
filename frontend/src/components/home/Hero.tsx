@@ -36,10 +36,10 @@ const Hero = () => {
   };
 
   return (
-    <section className="px-3 pb-6 pt-24 sm:px-5 sm:pt-28 lg:px-8">
-      <div className="relative mx-auto max-w-[1180px] overflow-visible rounded-[32px] bg-[#E4EFF6] px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+    <section className="px-0 pb-6 pt-24 sm:px-5 sm:pt-28 lg:px-8">
+      <div className="relative mx-auto max-w-[1180px] overflow-visible rounded-[32px] bg-[#E4EFF6] px-0 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
         <div className="grid items-center gap-8 md:grid-cols-[1.05fr_0.95fr] md:gap-8 lg:gap-10">
-          <div className="order-2 md:order-1">
+          <div className="order-2 px-5 md:order-1 md:px-0">
             <p className="text-center text-xs font-semibold text-[#C69259] md:text-left">
               For newcomers and families in Canada
             </p>
@@ -125,7 +125,7 @@ const Hero = () => {
             onJoin={() => navigate("/register")}
           />
         </div>
-        <p className="mt-6 text-xs text-[#12213E]/70">
+        <p className="mt-6 px-5 text-xs text-[#12213E]/70 sm:px-0">
           First Step Wealth Group has been guiding families toward financial
           freedom since 2022.
         </p>
@@ -281,6 +281,76 @@ const PATHS = [
   { label: "Insurance protection and guidance", dot: "bg-[#6E93B5]" },
 ];
 
+/** Dot-column heights (1–8) for the growth chart: early years soft, recent years brand. */
+const GROWTH_COLUMNS = [
+  { dots: 2, era: "past" as const },
+  { dots: 3, era: "past" as const },
+  { dots: 2, era: "past" as const },
+  { dots: 4, era: "past" as const },
+  { dots: 3, era: "past" as const },
+  { dots: 5, era: "past" as const },
+  { dots: 4, era: "now" as const },
+  { dots: 6, era: "now" as const },
+  { dots: 5, era: "now" as const },
+  { dots: 7, era: "now" as const },
+  { dots: 6, era: "now" as const },
+  { dots: 8, era: "now" as const },
+];
+
+const GrowthDotChart = ({ className = "" }: { className?: string }) => (
+  <figure
+    aria-label="Since 2022. Families 100 plus. Advisors 33 plus."
+    className={`overflow-hidden rounded-[20px] border border-[#12213E]/06 bg-white px-3 pb-2.5 pt-2.5 shadow-[0_14px_36px_rgba(18,33,62,0.14)] sm:rounded-[22px] sm:px-3.5 ${className}`}
+  >
+    <div className="flex items-start justify-between gap-2">
+      <div>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#12213E]/45">
+          Growth
+        </p>
+        <p className="mt-0.5 text-[22px] font-extrabold leading-none tracking-tight text-[#12213E] sm:text-2xl">
+          100<span className="text-[#C69259]">+</span>
+        </p>
+      </div>
+      <p className="pt-0.5 text-right text-[8px] font-semibold uppercase tracking-[0.08em] text-[#12213E]/40">
+        <span className="text-[#12213E]/25">Since</span>{" "}
+        <span className="text-[#C69259]">2022</span>
+      </p>
+    </div>
+
+    <div className="mt-2.5 border-t border-[#12213E]/08 pt-2.5" aria-hidden>
+      <div className="flex h-[72px] items-end justify-between gap-[3px] sm:h-[78px] sm:gap-1">
+        {GROWTH_COLUMNS.map((col, i) => (
+          <div
+            key={i}
+            className="flex flex-1 flex-col-reverse items-center gap-[3px]"
+          >
+            {Array.from({ length: col.dots }).map((_, d) => (
+              <span
+                key={d}
+                className={`h-[5px] w-[5px] rounded-full sm:h-1.5 sm:w-1.5 ${
+                  col.era === "now"
+                    ? d === col.dots - 1
+                      ? "bg-[#C69259]"
+                      : "bg-[#12213E]"
+                    : "bg-[#C5D4E3]"
+                }`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex items-center justify-between font-mono text-[8px] font-medium tracking-tight text-[#12213E]/55 sm:text-[9px]">
+        <span>
+          2022 <span className="text-[#12213E]/35">12</span>
+        </span>
+        <span>
+          Now <span className="font-semibold text-[#C69259]">100+</span>
+        </span>
+      </div>
+    </div>
+  </figure>
+);
+
 const Portrait = ({
   onRent,
   onJoin,
@@ -288,7 +358,7 @@ const Portrait = ({
   onRent: () => void;
   onJoin: () => void;
 }) => (
-  <div className="relative order-1 mx-auto w-full max-w-[520px] md:order-2 md:max-w-none">
+  <div className="relative order-1 mx-auto w-[98%] md:order-2 md:w-full md:max-w-none">
     <div className="relative h-[340px] sm:h-[400px] md:h-[440px] lg:h-[480px]">
       <img
         src="/hero-meeting.jpg"
@@ -303,39 +373,7 @@ const Portrait = ({
         Join us
         <ArrowRight className="h-3.5 w-3.5" />
       </button>
-      <figure
-        aria-label="Since 2022. Families 100 plus. Advisors 33 plus."
-        className="absolute left-3 top-3 z-10 w-[150px] rounded-2xl bg-white/95 px-2.5 pb-2 pt-2 shadow-[0_12px_30px_rgba(18,33,62,0.12)] backdrop-blur-sm sm:left-4 sm:top-4 sm:w-[168px]"
-      >
-        <figcaption className="text-[10px] font-bold text-[#12213E]">Since 2022</figcaption>
-        <svg viewBox="0 0 156 78" className="mt-0.5 h-[72px] w-full" aria-hidden>
-          <line x1="24" y1="12" x2="150" y2="12" stroke="#12213E" strokeOpacity="0.18" />
-          <line x1="24" y1="32" x2="150" y2="32" stroke="#12213E" strokeOpacity="0.14" />
-          <line x1="24" y1="52" x2="150" y2="52" stroke="#12213E" strokeOpacity="0.28" />
-          <text x="0" y="15" fill="#12213E" fontSize="8" fontWeight="700">100</text>
-          <text x="4" y="35" fill="#12213E" fontSize="8" fontWeight="700">50</text>
-          <text x="8" y="55" fill="#12213E" fontSize="8" fontWeight="700">0</text>
-          <path d="M28 52 C58 48 78 22 118 12 L118 52 Z" fill="#C69259" fillOpacity="0.22" />
-          <path d="M28 52 C58 48 78 22 118 12" fill="none" stroke="#C69259" strokeWidth="2.25" strokeLinecap="round" />
-          <circle cx="118" cy="12" r="3.2" fill="#fff" stroke="#C69259" strokeWidth="2" />
-          <path d="M28 52 C62 50 90 46 142 39" fill="none" stroke="#12213E" strokeWidth="2.25" strokeLinecap="round" />
-          <circle cx="142" cy="39" r="3.2" fill="#fff" stroke="#12213E" strokeWidth="2" />
-          <text x="96" y="9" fill="#12213E" fontSize="8" fontWeight="700">100+</text>
-          <text x="122" y="35" fill="#12213E" fontSize="8" fontWeight="700">33+</text>
-          <text x="22" y="68" fill="#12213E" fontSize="8" fontWeight="700">2022</text>
-          <text x="124" y="68" fill="#12213E" fontSize="8" fontWeight="700">Now</text>
-        </svg>
-        <div className="mt-0.5 flex items-center gap-3 pl-1 text-[9px] font-bold text-[#12213E]">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-3 rounded-full bg-[#C69259]" />
-            Families
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-3 rounded-full bg-[#12213E]" />
-            Advisors
-          </span>
-        </div>
-      </figure>
+      <GrowthDotChart className="absolute left-4 top-4 z-10 hidden w-[188px] md:block" />
       <button
         type="button"
         onClick={onRent}
@@ -347,6 +385,7 @@ const Portrait = ({
         </span>
       </button>
     </div>
+    <GrowthDotChart className="mt-3 w-full md:hidden" />
   </div>
 );
 

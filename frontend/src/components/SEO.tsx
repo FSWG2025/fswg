@@ -88,8 +88,8 @@ const SEO = ({
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={imageUrl} />
 
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="" />
+      <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
 
       {schemas.map((data, i) => (
         <script key={i} type="application/ld+json">

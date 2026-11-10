@@ -9,8 +9,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Gantari", "sans-serif"],
-        mono: ["Gantari", "sans-serif"],
+        sans: ["Satoshi", "sans-serif"],
+        mono: ["Satoshi", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

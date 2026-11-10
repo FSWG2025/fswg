@@ -68,6 +68,7 @@ export default function AdminDashboard({
   const dayNum = Number(
     new Intl.DateTimeFormat("en-US", { timeZone, day: "numeric" }).format(today),
   );
+  
   const formattedDate = today.toLocaleDateString("en-US", {
     timeZone,
     weekday: "long",

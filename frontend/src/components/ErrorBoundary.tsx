@@ -11,6 +11,11 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
+/** Vite exposes DEV; `process` is not defined in the browser bundle. */
+const showErrorDetail = Boolean(
+  (import.meta as { env?: { DEV?: boolean } }).env?.DEV,
+);
+
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -75,7 +80,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   </span>
                 </Link>
               </div>
-              {process.env.NODE_ENV !== "production" && this.state.error?.message && (
+              {showErrorDetail && this.state.error?.message && (
                 <div className="border-t border-[#E8EDF2] px-6 pb-8 sm:px-10">
                   <p className="rounded-2xl bg-[#F7FBFE] px-4 py-3 font-mono text-xs text-[#12213E]">
                     {this.state.error.message}

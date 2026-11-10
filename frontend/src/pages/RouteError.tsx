@@ -43,7 +43,9 @@ function getErrorDetails(error: unknown) {
       title: "Something went wrong",
       message: "An unexpected error interrupted this page.",
       kind: "unexpected" as const,
-      detail: process.env.NODE_ENV !== "production" ? error.message : undefined,
+      detail: (import.meta as { env?: { DEV?: boolean } }).env?.DEV
+        ? error.message
+        : undefined,
     };
   }
 

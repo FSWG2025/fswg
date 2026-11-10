@@ -65,6 +65,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
   }),
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -73,9 +74,16 @@ if (process.env.STAGE === "development") {
   app.use(morgan("dev"));
 }
 
+/** CLIENT_URL may be a single origin or comma-separated list (Vercel + custom domain). */
+const envClientOrigins = String(process.env.CLIENT_URL || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
-  process.env.CLIENT_URL,
+  ...envClientOrigins,
   "https://www.firststepwealthgroup.ca",
+  "https://firststepwealthgroup.ca",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
@@ -86,10 +94,11 @@ app.use(
     origin: function (origin, callback) {
       // Non-browser clients (no Origin) are allowed; browsers must match exactly
       if (!origin) return callback(null, true);
-      if (allowedOrigins.filter(Boolean).includes(origin)) {
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        // Prefer false over Error so preflight still gets a normal CORS response
+        callback(null, false);
       }
     },
     credentials: true,
