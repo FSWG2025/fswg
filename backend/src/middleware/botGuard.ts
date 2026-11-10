@@ -6,7 +6,6 @@ import {
   recordBotBlock,
 } from "../services/botDetection";
 import { getSystemSettings } from "../models/SystemSettings";
-import { isSuperAdmin } from "../constants/roles";
 import { logSystemAudit } from "../utils/logAudit";
 
 function clientIp(req: AuthRequest): string {
@@ -16,7 +15,7 @@ function clientIp(req: AuthRequest): string {
 
 /**
  * Blocks known bots / flooders from mutating public APIs.
- * Skips super_admin authenticated traffic.
+ * Skips any authenticated session (logged-in humans must never be locked out).
  */
 export const botGuard = async (
   req: AuthRequest,
@@ -25,7 +24,7 @@ export const botGuard = async (
 ) => {
   try {
     // Logged-in humans must never be locked out by bot heuristics / prior IP blocks
-    if (req.user || isSuperAdmin(req.user?.role)) return next();
+    if (req.user) return next();
 
     const settings = await getSystemSettings();
     if (settings.botBlockEnabled === false) return next();
