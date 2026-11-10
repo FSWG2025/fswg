@@ -138,6 +138,8 @@ export const trackVisit = async (req: Request, res: Response) => {
       hasVisitorId: true,
     });
     const settings = await getSystemSettings();
+    // Visitor beacons must never imprison real browsers. Record hard bots for
+    // forensics, but always continue so the SPA is not redirected to /blocked.
     if (settings.botBlockEnabled !== false && bot.shouldBlock) {
       await recordBotBlock({
         ip,
@@ -159,24 +161,16 @@ export const trackVisit = async (req: Request, res: Response) => {
         },
         { upsert: false },
       );
-      return res.status(403).json({
-        message: "Automated traffic is not allowed",
-        code: "BOT_BLOCKED",
-      });
+      return res.status(204).end();
     }
 
     let visitor = await SiteVisitor.findOne({ visitorId });
-    // Clear sticky false-positive visitor blocks when current assessment is clean
+    // Clear sticky false-positive visitor blocks — never 403 the track beacon
     if (visitor?.blocked && !bot.shouldBlock) {
       visitor.blocked = false;
       visitor.botScore = bot.score;
       visitor.botSignals = bot.signals;
       await visitor.save();
-    } else if (visitor?.blocked) {
-      return res.status(403).json({
-        message: "Access denied",
-        code: "BOT_BLOCKED",
-      });
     }
 
     let linkedUser;

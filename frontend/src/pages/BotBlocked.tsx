@@ -1,3 +1,5 @@
+import { resetVisitorId } from "@/lib/visitorId";
+
 export default function BotBlocked() {
   const retry = () => {
     try {
@@ -5,6 +7,7 @@ export default function BotBlocked() {
     } catch {
       /* ignore */
     }
+    resetVisitorId();
     window.location.replace("/");
   };
 

@@ -43,3 +43,14 @@ export function getOrCreateVisitorId(): string {
     return createId();
   }
 }
+
+/** Rotate visitor id after a false-positive block so sticky visitorId rows stop matching. */
+export function resetVisitorId(): string {
+  try {
+    document.cookie = `${COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`;
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  return getOrCreateVisitorId();
+}

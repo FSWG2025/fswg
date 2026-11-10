@@ -15,7 +15,7 @@ function utmFromSearch(search: string) {
 
 /**
  * Silent site visitor beacon. Runs on every route change.
- * Does not block UI if the API is down.
+ * Failures must never redirect or lock the UI — tracking is best-effort only.
  */
 const VisitorTracker = () => {
   const { pathname, search } = useLocation();
@@ -23,6 +23,9 @@ const VisitorTracker = () => {
   const lastSent = useRef("");
 
   useEffect(() => {
+    // Never beacon from the blocked page (avoids retry loops)
+    if (pathname.startsWith("/blocked")) return;
+
     const path = `${pathname}${search || ""}`;
     if (lastSent.current === path) return;
     lastSent.current = path;
@@ -45,17 +48,8 @@ const VisitorTracker = () => {
       userId: user?._id || undefined,
     };
 
-    api.post("/visitors/track", payload).catch((err) => {
-      if (err?.response?.status === 403 && err?.response?.data?.code === "BOT_BLOCKED") {
-        try {
-          sessionStorage.setItem("fswg_bot_blocked", "1");
-        } catch {
-          /* ignore */
-        }
-        if (!window.location.pathname.startsWith("/blocked")) {
-          window.location.replace("/blocked");
-        }
-      }
+    api.post("/visitors/track", payload).catch(() => {
+      // Telemetry only — never imprison the user on /blocked
     });
   }, [pathname, search, user?._id]);
 

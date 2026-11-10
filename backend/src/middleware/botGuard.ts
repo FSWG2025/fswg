@@ -39,6 +39,11 @@ export const botGuard = async (
         ? req.headers["user-agent"]
         : "";
 
+    const url = req.originalUrl.split("?")[0];
+    // Never block the visitor beacon — it only powers analytics and was locking
+    // real users behind /blocked via sticky false positives.
+    if (url.startsWith("/api/visitors")) return next();
+
     if (await isCurrentlyBlocked({ ip, visitorId })) {
       return res.status(403).json({
         message: "Access denied",
@@ -47,9 +52,7 @@ export const botGuard = async (
     }
 
     // Only score on public/high-volume endpoints — never on session/profile APIs
-    const url = req.originalUrl.split("?")[0];
     const watchPaths =
-      url.startsWith("/api/visitors") ||
       url.startsWith("/api/leads") ||
       url === "/api/users/register" ||
       url === "/api/users/login" ||
@@ -69,6 +72,7 @@ export const botGuard = async (
 
     (req as any).botAssessment = assessment;
 
+    // Only clear crawler / headless UAs — soft heuristics never 403
     if (assessment.shouldBlock) {
       await recordBotBlock({
         ip,
