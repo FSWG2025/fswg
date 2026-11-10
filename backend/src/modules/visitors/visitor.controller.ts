@@ -166,7 +166,13 @@ export const trackVisit = async (req: Request, res: Response) => {
     }
 
     let visitor = await SiteVisitor.findOne({ visitorId });
-    if (visitor?.blocked) {
+    // Clear sticky false-positive visitor blocks when current assessment is clean
+    if (visitor?.blocked && !bot.shouldBlock) {
+      visitor.blocked = false;
+      visitor.botScore = bot.score;
+      visitor.botSignals = bot.signals;
+      await visitor.save();
+    } else if (visitor?.blocked) {
       return res.status(403).json({
         message: "Access denied",
         code: "BOT_BLOCKED",

@@ -24,7 +24,8 @@ export const botGuard = async (
   next: NextFunction,
 ) => {
   try {
-    if (isSuperAdmin(req.user?.role)) return next();
+    // Logged-in humans must never be locked out by bot heuristics / prior IP blocks
+    if (req.user || isSuperAdmin(req.user?.role)) return next();
 
     const settings = await getSystemSettings();
     if (settings.botBlockEnabled === false) return next();
@@ -46,7 +47,7 @@ export const botGuard = async (
       });
     }
 
-    // Only score aggressively on public/high-volume endpoints
+    // Only score on public/high-volume endpoints — never on session/profile APIs
     const url = req.originalUrl.split("?")[0];
     const watchPaths =
       url.startsWith("/api/visitors") ||
@@ -67,7 +68,6 @@ export const botGuard = async (
       hasVisitorId: Boolean(visitorId),
     });
 
-    // Attach for controllers
     (req as any).botAssessment = assessment;
 
     if (assessment.shouldBlock) {
@@ -78,7 +78,7 @@ export const botGuard = async (
         reason: assessment.signals.join(", ") || "bot_score_threshold",
         score: assessment.score,
         signals: assessment.signals,
-        hours: 24,
+        hours: 6,
       });
       await logSystemAudit("Bot blocked", `IP ${ip} score=${assessment.score}`, {
         signals: assessment.signals,

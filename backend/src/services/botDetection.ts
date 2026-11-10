@@ -1,7 +1,19 @@
 import BotBlock from "../models/BotBlock";
 
+/**
+ * Known automation / crawler UAs only — avoid bare "bot" which false-positives
+ * on ordinary browsers and in-app WebViews.
+ */
 const BOT_UA =
-  /bot|crawler|spider|crawl|slurp|scrapy|curl\/|wget|python-requests|httpclient|java\/|go-http|libwww|headless|phantom|selenium|puppeteer|playwright|chatgpt|gptbot|claudebot|bytespider|semrush|ahrefs|mj12bot|dotbot|petalbot|yandexbot|bingpreview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot/i;
+  /(?:googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|embedly|redditbot|applebot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|gptbot|claudebot|chatgpt-user|bytespider|ccbot|amazonbot|anthropic-ai|cohere-ai|perplexitybot|imgsuch|scrapy|python-requests|go-http-client|libwww-perl|httpclient|java\/\d|curl\/\d|wget\/\d|phantomjs|headlesschrome|puppeteer|playwright)/i;
+
+/** Signals that justify a hard block (real automation). Soft fingerprint gaps never block alone. */
+const HARD_BLOCK_SIGNALS = new Set([
+  "bot_user_agent",
+  "headless_browser",
+  "missing_or_short_ua",
+  "path_velocity_flood",
+]);
 
 /** Path hit timestamps per IP for velocity scoring */
 const pathVelocity = new Map<string, number[]>();
@@ -27,39 +39,40 @@ export function assessBotSignals(input: {
 
   if (!ua || ua.length < 12) {
     signals.push("missing_or_short_ua");
-    score += 40;
+    score += 50;
   } else if (BOT_UA.test(ua)) {
     signals.push("bot_user_agent");
-    score += 70;
+    score += 80;
   }
 
-  if (/HeadlessChrome|PhantomJS|Electron/i.test(ua)) {
+  // Real headless automation only — do NOT treat Electron (Cursor, Slack, etc.) as a bot
+  if (/HeadlessChrome|PhantomJS/i.test(ua)) {
     signals.push("headless_browser");
-    score += 50;
+    score += 60;
   }
 
   if (!input.hasVisitorId) {
     signals.push("no_visitor_id");
-    score += 15;
+    score += 8;
   }
 
-  // Missing typical browser fingerprint fields on track calls
+  // Soft fingerprint gaps — scored for analytics, never enough to block alone
   if (input.path !== undefined) {
     if (!input.language) {
       signals.push("no_language");
-      score += 10;
+      score += 4;
     }
     if (!input.timezone) {
       signals.push("no_timezone");
-      score += 10;
+      score += 4;
     }
     if (!input.screen) {
       signals.push("no_screen");
-      score += 8;
+      score += 3;
     }
   }
 
-  // Path velocity: > 30 hits / 10s from same IP
+  // Path velocity: only extreme floods count as hard (shared NATs / SPA bursts are common)
   const ip = input.ip || "unknown";
   const now = Date.now();
   const windowMs = 10_000;
@@ -70,19 +83,31 @@ export function assessBotSignals(input: {
     const keys = [...pathVelocity.keys()].slice(0, 1000);
     for (const k of keys) pathVelocity.delete(k);
   }
-  if (hits.length >= 30) {
+  if (hits.length >= 50) {
     signals.push("path_velocity_flood");
-    score += 55;
-  } else if (hits.length >= 15) {
+    score += 40;
+  } else if (hits.length >= 25) {
     signals.push("path_velocity_high");
-    score += 25;
+    score += 12;
   }
 
   score = Math.min(100, score);
+
+  const hasHardSignal = signals.some((s) => HARD_BLOCK_SIGNALS.has(s));
+  // Block only when a hard automation signal is present AND score is high.
+  // Soft gaps (language/timezone/screen/visitor id) never trigger shouldBlock alone.
+  const shouldBlock =
+    hasHardSignal &&
+    score >= 70 &&
+    (signals.includes("bot_user_agent") ||
+      signals.includes("headless_browser") ||
+      signals.includes("missing_or_short_ua") ||
+      (signals.includes("path_velocity_flood") && !input.hasVisitorId));
+
   return {
     score,
     signals,
-    shouldBlock: score >= 70,
+    shouldBlock,
   };
 }
 
@@ -103,7 +128,14 @@ export async function isCurrentlyBlocked(opts: {
         $or: [
           { permanent: true },
           { blockedUntil: { $gt: now } },
-          { blockedUntil: null, permanent: false, score: { $gte: 70 } },
+        ],
+      },
+      // Ignore legacy soft/false-positive blocks (fingerprint-only scores)
+      {
+        $or: [
+          { permanent: true },
+          { signals: { $in: [...HARD_BLOCK_SIGNALS] } },
+          { score: { $gte: 85 } },
         ],
       },
     ],
@@ -122,7 +154,9 @@ export async function recordBotBlock(input: {
   hours?: number;
   permanent?: boolean;
 }) {
-  const hours = input.hours ?? 24;
+  const hard = input.signals.some((s) => HARD_BLOCK_SIGNALS.has(s));
+  // Prefer visitorId for non-permanent blocks so shared NATs are not poisoned
+  const hours = input.hours ?? (hard ? 6 : 1);
   const blockedUntil = input.permanent
     ? null
     : new Date(Date.now() + hours * 3600_000);
@@ -132,11 +166,17 @@ export async function recordBotBlock(input: {
   else if (input.ip) filter.ip = input.ip;
   else return null;
 
+  const setIp =
+    input.permanent ||
+    input.signals.includes("bot_user_agent") ||
+    input.signals.includes("headless_browser") ||
+    input.signals.includes("missing_or_short_ua");
+
   return BotBlock.findOneAndUpdate(
     filter,
     {
       $set: {
-        ip: input.ip,
+        ...(setIp ? { ip: input.ip } : {}),
         visitorId: input.visitorId,
         userAgent: (input.userAgent || "").slice(0, 500),
         reason: input.reason,
@@ -147,7 +187,10 @@ export async function recordBotBlock(input: {
         lastSeenAt: new Date(),
       },
       $inc: { hitCount: 1 },
-      $setOnInsert: { createdAt: new Date() },
+      $setOnInsert: {
+        createdAt: new Date(),
+        ...(setIp ? {} : { ip: undefined }),
+      },
     },
     { upsert: true, new: true },
   );

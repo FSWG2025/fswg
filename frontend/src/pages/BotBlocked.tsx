@@ -1,4 +1,13 @@
 export default function BotBlocked() {
+  const retry = () => {
+    try {
+      sessionStorage.removeItem("fswg_bot_blocked");
+    } catch {
+      /* ignore */
+    }
+    window.location.replace("/");
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0B1528] px-6 text-center">
       <div className="max-w-md">
@@ -13,6 +22,13 @@ export default function BotBlocked() {
           If you believe this is a mistake, contact First Step Wealth Group
           support from a normal browser session.
         </p>
+        <button
+          type="button"
+          onClick={retry}
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-[#C69259] px-5 py-2.5 text-sm font-semibold text-[#12213E] transition hover:bg-[#D4A574]"
+        >
+          Try again
+        </button>
       </div>
     </div>
   );
