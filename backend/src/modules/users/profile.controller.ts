@@ -9,8 +9,18 @@ import { USER_ROLES, isUserRole } from "../../constants/roles";
 export const getUserProfile = async (req: AuthRequest, res: Response) => {
   try {
     if (req.user) {
+      // Re-issue JWT for Bearer fallback. Cross-origin SPAs (custom domain → Render)
+      // often cannot rely on third-party cookies alone; Messages and other protect()
+      // routes need Authorization when the cookie is dropped by the browser.
+      const token = generateToken(req.user._id.toString(), res, {
+        sessionVersion: (req.user as any).sessionVersion || 0,
+        impersonatorId: req.impersonator?._id?.toString(),
+        grantId: req.impersonationGrantId,
+      });
+
       res.json({
         user: req.user,
+        token,
         impersonation: req.impersonator
           ? {
               active: true,

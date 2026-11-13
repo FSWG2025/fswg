@@ -17,11 +17,24 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const STORAGE_KEY = "fswg_user";
+const TOKEN_KEY = "fswg_token";
+
+function persistBearerToken(token: unknown) {
+  if (typeof token === "string" && token) {
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      /* private mode */
+    }
+  }
+}
 
 /** Never persist JWT inside the user blob (XSS would steal it twice). */
 function stripSecrets(u: User | null): User | null {
   if (!u) return null;
-  const { token: _t, ...rest } = u as User & { token?: string };
+  const { token, ...rest } = u as User & { token?: string };
+  // Keep Bearer fallback in sync whenever a token-bearing payload arrives
+  persistBearerToken(token);
   return rest as User;
 }
 
@@ -52,11 +65,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshUser = useCallback(async () => {
     try {
       const { data } = await api.get("/users/profile");
+      // Profile now returns token for cross-origin Bearer fallback (Messages, etc.)
+      persistBearerToken(data?.token);
       setUserState(stripSecrets(data.user));
     } catch {
       setUserState(null);
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem("fswg_token");
+      localStorage.removeItem(TOKEN_KEY);
     }
   }, []);
 
@@ -91,7 +106,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     finally {
       setUserState(null);
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem("fswg_token");
+      localStorage.removeItem(TOKEN_KEY);
       window.location.href = "/login";
     }
   }, []);

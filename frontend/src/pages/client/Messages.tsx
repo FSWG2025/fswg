@@ -45,6 +45,7 @@ export default function Messages() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
+    if (!user?._id) return;
     try {
       const { data } = await api.get("/messages");
       setMessages(data.messages || []);
@@ -55,13 +56,15 @@ export default function Messages() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?._id]);
 
   useEffect(() => {
+    if (!user?._id) return;
+    setLoading(true);
     load();
     const id = window.setInterval(load, 20000);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [load, user?._id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
