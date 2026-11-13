@@ -9,7 +9,7 @@
             "has": [
                 {
                     "type": "host",
-                    "value": "fswg-coral.vercel.app"
+                    "value": "^(?!www\\.firststepwealthgroup\\.ca$|firststepwealthgroup\\.ca$).+"
                 }
             ],
             "destination": "https://www.firststepwealthgroup.ca/:path*",
