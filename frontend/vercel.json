@@ -3,6 +3,19 @@
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
     "installCommand": "npm install",
+    "redirects": [
+        {
+            "source": "/:path*",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "fswg-coral.vercel.app"
+                }
+            ],
+            "destination": "https://www.firststepwealthgroup.ca/:path*",
+            "permanent": true
+        }
+    ],
     "rewrites": [
         {
             "source": "/(.*)",
