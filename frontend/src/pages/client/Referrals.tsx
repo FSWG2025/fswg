@@ -13,7 +13,8 @@ export default function Referrals() {
         .toUpperCase()}`,
     [user?._id],
   );
-  const link = `${window.location.origin}/register?ref=${code}`;
+  // Public register invite — never include session tokens or credentials
+  const link = `${window.location.origin}/register?ref=${encodeURIComponent(code)}`;
   const key = `fswg:referrals:${user?._id || "guest"}`;
   const [invites, setInvites] = useState<{ email: string; at: string }[]>([]);
   const [email, setEmail] = useState("");

@@ -53,6 +53,7 @@ api.interceptors.response.use(
     const data = response.data;
     // Prefer httpOnly cookie; keep Bearer only as a same-origin fallback for sockets.
     // Never persist the token inside the user object (handled in AuthProvider).
+    // Only store when the API explicitly issued a session token (self login/signup).
     if (data && typeof data.token === "string" && data.token) {
       localStorage.setItem("fswg_token", data.token);
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import AuthShell, {
   authPrimaryBtnClass,
 } from "@/components/auth/AuthShell";
 import { resolveAuthReturnTo, withReturnTo } from "@/lib/authReturnTo";
+import { stripSensitiveAuthParams } from "@/lib/authQuerySafety";
 
 const forgotSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -35,6 +36,16 @@ const ForgotPassword = () => {
     resolver: zodResolver(forgotSchema),
     defaultValues: { email: "" },
   });
+
+  useEffect(() => {
+    const cleaned = stripSensitiveAuthParams(searchParams);
+    if (!cleaned) return;
+    const qs = cleaned.toString();
+    navigate(
+      { pathname: "/forgot-password", search: qs ? `?${qs}` : "" },
+      { replace: true },
+    );
+  }, [searchParams, navigate]);
 
   const onSubmit = async (data: ForgotFormValues) => {
     setSubmitting(true);

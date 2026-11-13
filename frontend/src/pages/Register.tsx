@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import AuthShell, {
 import { markNewAccountWelcome } from "@/components/global/WelcomeModal";
 import { cn } from "@/lib/utils";
 import { resolveAuthReturnTo, withReturnTo } from "@/lib/authReturnTo";
+import { stripSensitiveAuthParams } from "@/lib/authQuerySafety";
 
 const registerSchema = z
   .object({
@@ -49,6 +50,7 @@ const steps = [
 ];
 
 function readPrefill(searchParams: URLSearchParams) {
+  // Lead/contact prefill only — never password/token from the query string
   return {
     name: searchParams.get("name")?.trim() || "",
     email: searchParams.get("email")?.trim() || "",
@@ -75,6 +77,8 @@ const Register = () => {
     fromParam: searchParams.get("from"),
     stateFrom: (location.state as { from?: unknown } | null)?.from,
   });
+  const inviteRef = searchParams.get("ref")?.trim() || "";
+  const isInviteLink = Boolean(inviteRef);
   const prefill = useMemo(() => readPrefill(searchParams), [searchParams]);
   const hasLeadPrefill = Boolean(prefill.name || prefill.email || prefill.phone);
 
@@ -85,6 +89,17 @@ const Register = () => {
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Strip credential-like params from invite / register URLs
+  useEffect(() => {
+    const cleaned = stripSensitiveAuthParams(searchParams);
+    if (!cleaned) return;
+    const qs = cleaned.toString();
+    navigate(
+      { pathname: "/register", search: qs ? `?${qs}` : "" },
+      { replace: true },
+    );
+  }, [searchParams, navigate]);
 
   const {
     register,
@@ -150,6 +165,64 @@ const Register = () => {
       setSubmitting(false);
     }
   };
+
+  // Invite links must not silently open the currently signed-in account
+  // (e.g. super admin session in another tab of the same browser).
+  if (user && !loading && isInviteLink) {
+    return (
+      <AuthShell
+        title="Invite received"
+        subtitle="A different account is currently signed in on this browser."
+        panelTitle="Accept this invite safely"
+        panelBody="Sign out first, then create or sign in with the account that should use this invite link."
+      >
+        <div className="space-y-4 rounded-2xl border border-[#E5EAF0] bg-[#F7FBFE] p-4 text-sm text-[#12213E]">
+          <p>
+            Signed in as{" "}
+            <span className="font-semibold">{user.email}</span>
+            {user.role ? (
+              <span className="text-[#6B7280]"> ({user.role.replace(/_/g, " ")})</span>
+            ) : null}
+            .
+          </p>
+          <p className="text-[#6B7280]">
+            To avoid mixing sessions, continue only after signing out.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await api.post("/users/logout");
+            } catch {
+              /* still clear local session */
+            }
+            setUser(null);
+            try {
+              localStorage.removeItem("fswg_user");
+              localStorage.removeItem("fswg_token");
+            } catch {
+              /* private mode */
+            }
+            // Preserve invite ref — do not bounce to /login with another session's autofill
+            const qs = new URLSearchParams();
+            qs.set("ref", inviteRef);
+            window.location.replace(`/register?${qs.toString()}`);
+          }}
+          className={`${authPrimaryBtnClass} mt-6`}
+        >
+          <span className="absolute inset-y-0 left-0 w-1 bg-[#C69259]" aria-hidden />
+          Sign out to continue
+        </button>
+        <p className="mt-4 text-center text-sm text-[#6B7280]">
+          Or{" "}
+          <Link to="/dashboard" className="font-semibold text-[#12213E] hover:text-[#C69259]">
+            go to your dashboard
+          </Link>
+        </p>
+      </AuthShell>
+    );
+  }
 
   if (user && !loading) return <Navigate to="/dashboard" />;
 
@@ -372,6 +445,7 @@ const Register = () => {
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       placeholder="Create a password"
                       {...register("password")}
                       className={`${authFieldClass} pr-12`}
@@ -395,6 +469,7 @@ const Register = () => {
                   <div className="relative">
                     <input
                       type={showConfirm ? "text" : "password"}
+                      autoComplete="new-password"
                       placeholder="Confirm password"
                       {...register("confirmPassword")}
                       className={`${authFieldClass} pr-12`}

@@ -219,6 +219,7 @@ export default function VideoRooms() {
   };
 
   const copyInvite = async () => {
+    // Room only — never append tokens/credentials. Recipients sign in as themselves.
     const link = `${window.location.origin}/app/video?room=${encodeURIComponent(roomSlug)}`;
     await navigator.clipboard.writeText(link);
     toast.success("Invite link copied");

@@ -168,9 +168,15 @@ const UniversalUserForm = ({
         navigate("/dashboard");
       } else if (type === "create") {
         const { data: newUser } = await api.post("/users/register", payload);
-        setUser(newUser);
-        toast.success("Account created successfully! 🎉");
-        navigate("/dashboard");
+        // Only adopt a session when the API issued a token (self-signup).
+        // Admin-provisioned creates must not switch the current browser session.
+        if (newUser?.token) {
+          setUser(newUser);
+          toast.success("Account created successfully! 🎉");
+          navigate("/dashboard");
+        } else {
+          toast.success("Account created successfully");
+        }
         onSuccess?.();
       } else if (type === "update" && initialData?._id) {
         // Remove confirmPassword before sending

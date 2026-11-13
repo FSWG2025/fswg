@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import AuthShell, {
   authPrimaryBtnClass,
 } from "@/components/auth/AuthShell";
 import { resolveAuthReturnTo, withReturnTo } from "@/lib/authReturnTo";
+import { stripSensitiveAuthParams } from "@/lib/authQuerySafety";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
@@ -32,15 +33,32 @@ const Login = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Never allow credential-like query params to linger on /login
+  useEffect(() => {
+    const cleaned = stripSensitiveAuthParams(searchParams);
+    if (!cleaned) return;
+    const qs = cleaned.toString();
+    navigate(
+      { pathname: "/login", search: qs ? `?${qs}` : "" },
+      { replace: true },
+    );
+  }, [searchParams, navigate]);
+
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    // Always empty — never seed from URL, auth state, or cached user
     defaultValues: { email: "", password: "" },
     mode: "onChange",
   });
+
+  useEffect(() => {
+    reset({ email: "", password: "" });
+  }, [reset]);
 
   const onSubmit = async (data: LoginFormValues) => {
     setSubmitting(true);
@@ -65,14 +83,20 @@ const Login = () => {
       panelTitle="Your client hub, ready when you are"
       panelBody="Pick up consultations, rental applications, messages, and planning tools in one secure place."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-5"
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore
+      >
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
             Email
           </label>
           <input
             type="email"
-            autoComplete="email"
+            autoComplete="username"
             placeholder="you@example.com"
             {...register("email")}
             className={authFieldClass}

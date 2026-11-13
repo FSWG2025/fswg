@@ -76,16 +76,23 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (newUser) {
-      generateToken(newUser._id.toString(), res, {
-        sessionVersion: newUser.sessionVersion || 0,
-      });
+      // If the caller already has a session (admin provisioning a user), do NOT
+      // replace their JWT cookie / return a token for the new account. Doing so
+      // swapped identities across tabs and made invite links open the wrong user.
+      const provisionedByExistingSession = Boolean((req as any).user);
+      let token: string | undefined;
+      if (!provisionedByExistingSession) {
+        token = generateToken(newUser._id.toString(), res, {
+          sessionVersion: newUser.sessionVersion || 0,
+        });
+      }
 
       const actorId =
         (req as any).user?._id?.toString() || newUser._id.toString();
       await logAudit({
         userId: actorId,
-        action: (req as any).user ? "Registered User" : "Signed Up",
-        details: `${(req as any).user ? "Admin registered" : "New signup"} ${newUser.email} (${newUser.role})`,
+        action: provisionedByExistingSession ? "Registered User" : "Signed Up",
+        details: `${provisionedByExistingSession ? "Admin registered" : "New signup"} ${newUser.email} (${newUser.role})`,
         resourceType: "auth",
         resourceId: newUser._id.toString(),
         req,
@@ -101,7 +108,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         address: newUser.address,
         clientType: newUser.clientType,
         isActive: newUser.isActive,
-        message: "User registered successfully",
+        // Only return a session token for anonymous self-signup
+        ...(token ? { token } : {}),
+        message: provisionedByExistingSession
+          ? "User created successfully"
+          : "User registered successfully",
       });
       return;
     } else {
